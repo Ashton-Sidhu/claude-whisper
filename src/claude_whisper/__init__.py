@@ -34,7 +34,6 @@ class ClaudeTmux:
             ["tmux", "display-message", "-t", self.session_name, "-p", "'#{session_windows}'"],
             stdout=subprocess.PIPE,
             text=True,
-            stderr=subprocess.STDOUT,
         )
 
         if proc.returncode:
@@ -166,7 +165,9 @@ def main(working_dir: str) -> None:
 
             logger.info("Sending audio data to model")
             # Process audio with mlx_whisper
-            result = mlx_whisper.transcribe(audio_data, path_or_hf_repo=config.model_name, language="en")
+            result = mlx_whisper.transcribe(
+                audio_data, path_or_hf_repo=config.model_name, language="en", prompt=config.command
+            )
             transcription = result["text"].strip().lower()  # Normalize text for comparison
 
             logger.info(transcription)
@@ -176,6 +177,7 @@ def main(working_dir: str) -> None:
                 # logger.debug("running command: ", config.command)
                 claude_command = transcription.removeprefix(config.command).removeprefix(",").strip()
 
+                logger.debug(claude_command)
                 session = tmux.run(claude_command)
                 ACTIVE_SESSIONS.append(session)
 

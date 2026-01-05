@@ -29,7 +29,7 @@ members = [
 ]
 
 [tool.uv.sources]
-claude-whisper = { workspace = true, editable = true }
+claude-whisper = { workspace = true}
 
 [dependency-groups]
 dev = [

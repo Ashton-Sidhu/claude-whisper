@@ -12,7 +12,7 @@ class Config(BaseSettings):
     )
 
     model_name: str = Field(
-        default="mlx-community/whisper-large-v3-mlx",
+        default="mlx-community/whisper-medium-mlx-8bit",
         description="Whisper model name for transcription",
     )
 

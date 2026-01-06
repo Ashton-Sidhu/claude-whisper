@@ -8,12 +8,12 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
+    "claude-agent-sdk>=0.1.18",
     "loguru>=0.7.3",
     "mlx-whisper>=0.4.3",
     "pyaudio>=0.2.14",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "typer>=0.21.0",
 ]
 
 [project.scripts]

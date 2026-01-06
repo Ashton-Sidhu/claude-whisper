@@ -1,3 +1,5 @@
+import argparse
+import asyncio
 import os
 import subprocess
 import sys
@@ -5,12 +7,55 @@ import sys
 import mlx_whisper
 import numpy as np
 import pyaudio
-import typer
+from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock
 from loguru import logger
 
 from .config import config
 
-app = typer.Typer()
+
+class ClaudeSDKSession:
+    """Maintains a single conversation session with Claude."""
+
+    def __init__(self, options: ClaudeAgentOptions = None):
+        self.client = ClaudeSDKClient(options)
+        self.turn_count = 0
+
+    async def run(self, command):
+        await self.client.connect()
+        await self.client.query(command)
+        self.turn_count += 1
+
+        # Process response
+        print(f"[Turn {self.turn_count}] Claude: ", end="")
+        async for message in self.client.receive_response():
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        print(block.text, end="")
+        print()  # New line after response
+
+        await self.client.disconnect()
+        print(f"Conversation ended after {self.turn_count} turns.")
+
+    # async def main():
+
+
+#     options = ClaudeAgentOptions(
+#         allowed_tools=["Read", "Write", "Bash"],
+#         permission_mode="acceptEdits"
+#     )
+#     session = ConversationSession(options)
+#     await session.start()
+
+# Example conversation:
+# Turn 1 - You: "Create a file called hello.py"
+# Turn 1 - Claude: "I'll create a hello.py file for you..."
+# Turn 2 - You: "What's in that file?"
+# Turn 2 - Claude: "The hello.py file I just created contains..." (remembers!)
+# Turn 3 - You: "Add a main function to it"
+# Turn 3 - Claude: "I'll add a main function to hello.py..." (knows which file!)
+
+# asyncio.run(main())
 
 
 class ClaudeSession:
@@ -108,10 +153,9 @@ class ClaudeTmux:
 ACTIVE_SESSIONS: list[ClaudeSession] = []
 
 
-@app.command()
-def main(working_dir: str, bypass_whisper: bool = False) -> None:
+async def run_whisper(working_dir: str, bypass_whisper: bool = False) -> None:
     claude_working_dir = os.path.expanduser(working_dir)
-    tmux = ClaudeTmux(claude_working_dir)
+    # tmux = ClaudeTmux(claude_working_dir)
 
     # Bypass mode: accept text input directly
     if bypass_whisper:
@@ -119,13 +163,20 @@ def main(working_dir: str, bypass_whisper: bool = False) -> None:
         while True:
             try:
                 print("Enter command: ", end="", file=sys.stderr)
-                user_input = input().strip()
+                # Use to_thread to make input non-blocking so background tasks can run
+                user_input = await asyncio.to_thread(input)
+                user_input = user_input.strip()
 
                 if not user_input:
                     continue
 
                 logger.info(f"Received input: {user_input}")
-                session = tmux.run(user_input)
+                session = ClaudeSDKSession()
+
+                # Start the session in the background without waiting
+                task = asyncio.create_task(session.run(user_input))
+
+                # session = tmux.run(user_input)
                 ACTIVE_SESSIONS.append(session)
 
             except (KeyboardInterrupt, EOFError):
@@ -202,4 +253,13 @@ def main(working_dir: str, bypass_whisper: bool = False) -> None:
                 ACTIVE_SESSIONS.append(session)
 
 
-app()
+def main():
+    parser = argparse.ArgumentParser(description="Claude Whisper - Voice-activated Claude AI assistant")
+    parser.add_argument("working_dir", type=str, help="Working directory for Claude sessions")
+    parser.add_argument(
+        "--bypass-whisper", action="store_true", default=False, help="Bypass whisper and accept text input directly"
+    )
+
+    args = parser.parse_args()
+
+    asyncio.run(run_whisper(args.working_dir, args.bypass_whisper))

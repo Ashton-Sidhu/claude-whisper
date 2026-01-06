@@ -110,9 +110,29 @@ ACTIVE_SESSIONS: list[ClaudeSession] = []
 
 
 @app.command()
-def main(working_dir: str) -> None:
+def main(working_dir: str, bypass_whisper: bool = False) -> None:
     claude_working_dir = os.path.expanduser(working_dir)
     tmux = ClaudeTmux(claude_working_dir)
+
+    # Bypass mode: accept text input directly
+    if bypass_whisper:
+        logger.info("Running in bypass mode - accepting text input directly")
+        while True:
+            try:
+                print("Enter command: ", end="", file=sys.stderr)
+                user_input = input().strip()
+
+                if not user_input:
+                    continue
+
+                logger.info(f"Received input: {user_input}")
+                session = tmux.run(user_input)
+                ACTIVE_SESSIONS.append(session)
+
+            except (KeyboardInterrupt, EOFError):
+                logger.info("Exiting bypass mode")
+                break
+        return
 
     audio = pyaudio.PyAudio()
     stream = audio.open(

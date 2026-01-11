@@ -9,6 +9,7 @@ import pyaudio
 from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock
 from desktop_notifier import DesktopNotifier
 from loguru import logger
+from mlx_whisper import load_models
 from pynput import keyboard
 
 from .config import config
@@ -111,13 +112,13 @@ async def _run_audio_mode(working_dir: str) -> None:
     def on_press(key):
         """Start recording when push-to-talk key is pressed."""
         if key == push_to_talk_key:
-            logger.info("Push-to-talk activated")
+            logger.debug("Push-to-talk activated")
             loop.call_soon_threadsafe(is_recording.set)
 
     def on_release(key):
         """Stop recording when push-to-talk key is released."""
         if key == push_to_talk_key:
-            logger.info("Push-to-talk released")
+            logger.debug("Push-to-talk released")
             loop.call_soon_threadsafe(is_recording.clear)
 
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
@@ -125,17 +126,17 @@ async def _run_audio_mode(working_dir: str) -> None:
     logger.info(f"Keyboard listener started. Hold '{config.push_to_talk_key}' to record...")
 
     audio = pyaudio.PyAudio()
-    stream = audio.open(
-        format=config.format,
-        channels=config.channels,
-        rate=config.rate,
-        input=True,
-        frames_per_buffer=config.chunk,
-    )
-
     try:
         while True:
             await is_recording.wait()
+
+            stream = audio.open(
+                format=config.format,
+                channels=config.channels,
+                rate=config.rate,
+                input=True,
+                frames_per_buffer=config.chunk,
+            )
 
             frames = []
             logger.info("Recording...", file=sys.stderr)
@@ -184,6 +185,9 @@ async def _run_audio_mode(working_dir: str) -> None:
 async def run_whisper(working_dir: str, bypass_whisper: bool = False) -> None:
     """Main entry point for running Claude Whisper in either bypass or audio mode."""
     working_dir = os.path.expanduser(working_dir)
+
+    logger.info(f"Loading model: {config.model_name}")
+    load_models.load_model(config.model_name)
 
     if bypass_whisper:
         await _run_bypass_mode(working_dir)

@@ -166,7 +166,7 @@ async def _run_audio_mode(working_dir: str) -> None:
                     audio_data,
                     path_or_hf_repo=config.model_name,
                     language="en",
-                    prompt=config.command,
+                    prompt="{config.command}, linting",
                 )
                 transcription = result["text"].strip().lower()
                 logger.info(f"Transcription: {transcription}")

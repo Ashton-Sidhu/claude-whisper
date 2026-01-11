@@ -1,15 +1,32 @@
+import os
+
 import pyaudio
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict, TomlConfigSettingsSource, PydanticBaseSettingsSource
 
 
 class Config(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="CLAUDE_WHISPER_",
-        env_file=".env",
-        env_file_encoding="utf-8",
+        toml_file=os.path.expanduser("~/.config/claude-whisper/config.toml"),
         extra="ignore",
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            env_settings,
+            TomlConfigSettingsSource(settings_cls),
+            file_secret_settings,
+        )
 
     model_name: str = Field(
         default="mlx-community/whisper-medium-mlx-8bit",
@@ -59,6 +76,11 @@ class Config(BaseSettings):
     permission_mode: str = Field(
         default="acceptEdits",
         description="Permission mode for Claude session (acceptEdits, bypassPermissions, default, delegate, dontAsk, plan)",
+    )
+
+    push_to_talk_key: str = Field(
+        default="esc",
+        description="Key or key combination for push-to-talk (e.g., 'esc', 'ctrl+shift+r')",
     )
 
 

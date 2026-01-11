@@ -15,6 +15,7 @@ dependencies = [
     "pyaudio>=0.2.14",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "pynput>=1.8.1",
 ]
 
 [project.scripts]
@@ -35,6 +36,7 @@ claude-whisper = { workspace = true}
 [dependency-groups]
 dev = [
     "claude-whisper",
+    "pytest>=8.0.0",
     "ruff>=0.8.6",
 ]
 

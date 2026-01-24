@@ -23,6 +23,13 @@ Claude Whisper enables voice interaction with Claude Code through push-to-talk f
 - PortAudio (for microphone input)
 - Anthropic API key (for Claude Agent SDK)
 
+### macOS Permissions
+
+Your terminal application needs the following permissions enabled in System Settings > Security & Privacy:
+
+- **Input Monitoring** - Required for detecting push-to-talk key presses
+- **Accessibility** - Required for keyboard event monitoring
+
 ## Installation
 
 1. Install system dependencies:

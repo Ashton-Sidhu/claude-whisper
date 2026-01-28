@@ -1,9 +1,8 @@
 """Test suite for main application logic."""
 
-import asyncio
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest

@@ -70,7 +70,10 @@ class Config(BaseSettings):
 
     permission_mode: str = Field(
         default="acceptEdits",
-        description="Permission mode for Claude session (acceptEdits, bypassPermissions, default, delegate, dontAsk, plan)",
+        description=(
+            "Permission mode for Claude session "
+            "(acceptEdits, bypassPermissions, default, delegate, dontAsk, plan)"
+        ),
     )
 
     push_to_talk_key: str = Field(

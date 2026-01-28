@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
 import pytest
@@ -23,7 +23,7 @@ class TestRunBypassMode:
             try:
                 return next(inputs)
             except StopIteration:
-                raise EOFError
+                raise EOFError from None
 
         with patch("claude_whisper._run_claude_task", new_callable=AsyncMock) as mock_run_task:
             with patch("asyncio.to_thread", side_effect=mock_input):
@@ -45,9 +45,9 @@ class TestRunBypassMode:
             try:
                 return next(inputs)
             except StopIteration:
-                raise EOFError
+                raise EOFError from None
 
-        with patch("claude_whisper._run_claude_task", new_callable=AsyncMock) as mock_run_task:
+        with patch("claude_whisper._run_claude_task", new_callable=AsyncMock):
             with patch("asyncio.to_thread", side_effect=mock_input):
                 with patch("builtins.print"):
                     with patch("asyncio.create_task") as mock_create_task:
@@ -68,9 +68,9 @@ class TestRunBypassMode:
             try:
                 return next(inputs)
             except StopIteration:
-                raise EOFError
+                raise EOFError from None
 
-        with patch("claude_whisper._run_claude_task", new_callable=AsyncMock) as mock_run_task:
+        with patch("claude_whisper._run_claude_task", new_callable=AsyncMock):
             with patch("asyncio.to_thread", side_effect=mock_input):
                 with patch("builtins.print"):
                     with patch("asyncio.create_task") as mock_create_task:
@@ -194,7 +194,7 @@ class TestRunAudioMode:
 
                             with patch("asyncio.to_thread", side_effect=lambda f, *args, **kwargs: f(*args, **kwargs)):
                                 with patch("claude_whisper._run_claude_task", new_callable=AsyncMock):
-                                    with patch("asyncio.create_task") as mock_create_task:
+                                    with patch("asyncio.create_task"):
                                         try:
                                             await _run_audio_mode(Path("/tmp"))
                                         except (asyncio.CancelledError, AttributeError):

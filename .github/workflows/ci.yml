@@ -36,6 +36,7 @@ jobs:
         run: uv run ruff check .
 
   test:
+    needs: lint
     runs-on: macos-latest
     strategy:
       fail-fast: false

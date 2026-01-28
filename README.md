@@ -147,4 +147,4 @@ See LICENSE file for details.
 
 ## Author
 
-Ashton Sidhu (ashton.sidhu1994@gmail.com)
+Ashton Sidhu (ashton@sidhulabs.ca)

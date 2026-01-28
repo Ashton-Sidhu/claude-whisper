@@ -18,9 +18,9 @@ class TestConfig:
         assert config.silence_threshold == 500
         assert config.silence_chunks == 30
         assert config.command == "jarvis"
-        assert config.tmux_session_name == "claude"
         assert config.permission_mode == "acceptEdits"
         assert config.push_to_talk_key == "esc"
+        assert config.plan_folder == "plans"
 
     def test_env_var_loading(self, monkeypatch):
         """Test that environment variables with CLAUDE_WHISPER_ prefix are loaded."""
@@ -30,9 +30,9 @@ class TestConfig:
         monkeypatch.setenv("CLAUDE_WHISPER_SILENCE_THRESHOLD", "1000")
         monkeypatch.setenv("CLAUDE_WHISPER_SILENCE_CHUNKS", "50")
         monkeypatch.setenv("CLAUDE_WHISPER_CHUNK", "2048")
-        monkeypatch.setenv("CLAUDE_WHISPER_TMUX_SESSION_NAME", "my-session")
         monkeypatch.setenv("CLAUDE_WHISPER_PERMISSION_MODE", "plan")
         monkeypatch.setenv("CLAUDE_WHISPER_PUSH_TO_TALK_KEY", "ctrl+shift+r")
+        monkeypatch.setenv("CLAUDE_WHISPER_PLAN_FOLDER", "custom_plans")
 
         config = Config()
 
@@ -42,9 +42,9 @@ class TestConfig:
         assert config.silence_threshold == 1000
         assert config.silence_chunks == 50
         assert config.chunk == 2048
-        assert config.tmux_session_name == "my-session"
         assert config.permission_mode == "plan"
         assert config.push_to_talk_key == "ctrl+shift+r"
+        assert config.plan_folder == "custom_plans"
 
     def test_toml_file_loading_via_init(self, tmp_path):
         """Test loading TOML file by providing path directly."""

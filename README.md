@@ -93,6 +93,25 @@ permission_mode = "acceptEdits"
 
 ## Development
 
+### Testing
+
+Run the test suite:
+```bash
+make test
+```
+
+Run tests with coverage:
+```bash
+pytest --cov=src/claude_whisper --cov-report=term-missing
+```
+
+Run specific test files:
+```bash
+pytest tests/test_config.py
+pytest tests/test_main.py
+pytest tests/test_integration.py
+```
+
 ### Code Quality
 
 Format code:

@@ -2,7 +2,7 @@ import os
 
 import pyaudio
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict, TomlConfigSettingsSource, PydanticBaseSettingsSource
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
 
 
 class Config(BaseSettings):
@@ -68,11 +68,6 @@ class Config(BaseSettings):
         description="Wake word command to trigger Claude",
     )
 
-    tmux_session_name: str = Field(
-        default="claude",
-        description="Name of the tmux session",
-    )
-
     permission_mode: str = Field(
         default="acceptEdits",
         description="Permission mode for Claude session (acceptEdits, bypassPermissions, default, delegate, dontAsk, plan)",
@@ -81,6 +76,11 @@ class Config(BaseSettings):
     push_to_talk_key: str = Field(
         default="esc",
         description="Key or key combination for push-to-talk (e.g., 'esc', 'ctrl+shift+r')",
+    )
+
+    plan_folder: str = Field(
+        default="plans",
+        description="Folder inside the repository where Claudes design plans should go.",
     )
 
 

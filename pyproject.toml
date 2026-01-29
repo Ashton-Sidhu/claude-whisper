@@ -1,10 +1,10 @@
 [project]
 name = "claude-whisper"
 version = "0.1.0"
-description = "Add your description here"
+description = "Use claude code via voice."
 readme = "README.md"
 authors = [
-    { name = "Ashton Sidhu", email = "ashton.sidhu1994@gmail.com" }
+    { name = "Ashton Sidhu", email = "sidhuashton@gmail.com" }
 ]
 requires-python = ">=3.10"
 dependencies = [

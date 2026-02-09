@@ -4,17 +4,27 @@ import os
 import re
 import sys
 import textwrap
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from uuid import uuid4
 
+_import_start = time.perf_counter()
+
+_t = time.perf_counter()
 import mlx_whisper
+print(f"[import timing] mlx_whisper: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
+
+_t = time.perf_counter()
 import numpy as np
+print(f"[import timing] numpy: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
 try:
+    _t = time.perf_counter()
     import pyaudio
+    print(f"[import timing] pyaudio: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 except ImportError as e:
     if "portaudio" in str(e).lower() or "could not import" in str(e).lower():
         print(
@@ -29,13 +39,31 @@ except ImportError as e:
         sys.exit(1)
     raise
 
+_t = time.perf_counter()
 from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock, ToolUseBlock
-from desktop_notifier import DesktopNotifier
-from loguru import logger
-from mlx_whisper import load_models
-from pynput import keyboard
+print(f"[import timing] claude_agent_sdk: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
+_t = time.perf_counter()
+from desktop_notifier import DesktopNotifier
+print(f"[import timing] desktop_notifier: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
+
+_t = time.perf_counter()
+from loguru import logger
+print(f"[import timing] loguru: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
+
+_t = time.perf_counter()
+from mlx_whisper import load_models
+print(f"[import timing] mlx_whisper.load_models: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
+
+_t = time.perf_counter()
+from pynput import keyboard
+print(f"[import timing] pynput: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
+
+_t = time.perf_counter()
 from .config import config
+print(f"[import timing] config: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
+
+print(f"[import timing] total imports: {time.perf_counter() - _import_start:.3f}s", file=sys.stderr)
 
 notifier = DesktopNotifier(app_name="Claude Whisper")
 AUDIO_NORMALIZATION_FACTOR = 32768.0

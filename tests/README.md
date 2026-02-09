@@ -42,7 +42,6 @@ Tests for core application components:
 
 #### `test_integration.py`
 Tests for main entry points and mode switching:
-- **_run_bypass_mode**: Text input mode testing
 - **_run_audio_mode**: Audio recording and keyboard listener testing
 - **run_whisper**: Model loading, path expansion, and mode routing
 

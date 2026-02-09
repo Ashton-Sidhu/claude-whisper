@@ -7,93 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import numpy as np
 import pytest
 
-from claude_whisper import _run_audio_mode, _run_bypass_mode, run_whisper
-
-
-class TestRunBypassMode:
-    """Test _run_bypass_mode function."""
-
-    @pytest.mark.asyncio
-    async def test_bypass_mode_accepts_input(self):
-        """Test that bypass mode accepts and processes text input."""
-        # Simulate user entering one command then EOF
-        inputs = iter(["test command", ""])
-
-        async def mock_input(*args, **kwargs):
-            try:
-                return next(inputs)
-            except StopIteration:
-                raise EOFError from None
-
-        with patch("claude_whisper._run_claude_task", new_callable=AsyncMock) as mock_run_task:
-            with patch("asyncio.to_thread", side_effect=mock_input):
-                with patch("builtins.print"):
-                    try:
-                        await _run_bypass_mode(Path("/tmp"))
-                    except EOFError:
-                        pass
-
-                    # Should have been called once with the command
-                    mock_run_task.assert_called()
-
-    @pytest.mark.asyncio
-    async def test_bypass_mode_strips_input(self):
-        """Test that bypass mode strips whitespace from input."""
-        inputs = iter(["  test command  ", ""])
-
-        async def mock_input(*args, **kwargs):
-            try:
-                return next(inputs)
-            except StopIteration:
-                raise EOFError from None
-
-        with patch("claude_whisper._run_claude_task", new_callable=AsyncMock):
-            with patch("asyncio.to_thread", side_effect=mock_input):
-                with patch("builtins.print"):
-                    with patch("asyncio.create_task") as mock_create_task:
-                        try:
-                            await _run_bypass_mode(Path("/tmp"))
-                        except EOFError:
-                            pass
-
-                        # Verify create_task was called (input was not empty after strip)
-                        assert mock_create_task.called
-
-    @pytest.mark.asyncio
-    async def test_bypass_mode_ignores_empty_input(self):
-        """Test that bypass mode ignores empty input."""
-        inputs = iter(["", "  ", ""])
-
-        async def mock_input(*args, **kwargs):
-            try:
-                return next(inputs)
-            except StopIteration:
-                raise EOFError from None
-
-        with patch("claude_whisper._run_claude_task", new_callable=AsyncMock):
-            with patch("asyncio.to_thread", side_effect=mock_input):
-                with patch("builtins.print"):
-                    with patch("asyncio.create_task") as mock_create_task:
-                        try:
-                            await _run_bypass_mode(Path("/tmp"))
-                        except EOFError:
-                            pass
-
-                        # Should not create any tasks for empty input
-                        mock_create_task.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_bypass_mode_handles_keyboard_interrupt(self):
-        """Test that bypass mode handles KeyboardInterrupt gracefully."""
-
-        async def mock_input(*args, **kwargs):
-            raise KeyboardInterrupt
-
-        with patch("asyncio.to_thread", side_effect=mock_input):
-            with patch("builtins.print"):
-                with patch("claude_whisper.logger.info") as mock_logger:
-                    await _run_bypass_mode(Path("/tmp"))
-                    mock_logger.assert_any_call("Exiting bypass mode")
+from claude_whisper import _run_audio_mode, run_whisper
 
 
 class TestRunAudioMode:
@@ -128,7 +42,7 @@ class TestRunAudioMode:
                         mock_event_class.return_value = mock_event
 
                         try:
-                            await _run_audio_mode(Path("/tmp"))
+                            await _run_audio_mode()
                         except (asyncio.CancelledError, AttributeError, UnboundLocalError):
                             pass
 
@@ -196,7 +110,7 @@ class TestRunAudioMode:
                                 with patch("claude_whisper._run_claude_task", new_callable=AsyncMock):
                                     with patch("asyncio.create_task"):
                                         try:
-                                            await _run_audio_mode(Path("/tmp"))
+                                            await _run_audio_mode()
                                         except (asyncio.CancelledError, AttributeError):
                                             pass
 
@@ -217,28 +131,15 @@ class TestRunWhisper:
 
             with patch("claude_whisper.load_models.load_model") as mock_load:
                 with patch("os.makedirs") as mock_makedirs:
-                    with patch("claude_whisper._run_bypass_mode", new_callable=AsyncMock):
-                        await run_whisper(Path("/tmp"), bypass_whisper=True)
+                    with patch("claude_whisper._run_audio_mode", new_callable=AsyncMock):
+                        await run_whisper()
 
                         mock_load.assert_called_once_with("test-model")
                         mock_makedirs.assert_called_once_with("plans", exist_ok=True)
 
     @pytest.mark.asyncio
-    async def test_run_whisper_bypass_mode(self):
-        """Test that run_whisper calls bypass mode when requested."""
-        with patch("claude_whisper.config") as mock_config:
-            mock_config.model_name = "test-model"
-            mock_config.plan_folder = "plans"
-
-            with patch("claude_whisper.load_models.load_model"):
-                with patch("os.makedirs"):
-                    with patch("claude_whisper._run_bypass_mode", new_callable=AsyncMock) as mock_bypass:
-                        await run_whisper(Path("/tmp"), bypass_whisper=True)
-                        mock_bypass.assert_called_once_with(Path("/tmp"))
-
-    @pytest.mark.asyncio
     async def test_run_whisper_audio_mode(self):
-        """Test that run_whisper calls audio mode by default."""
+        """Test that run_whisper calls audio mode."""
         with patch("claude_whisper.config") as mock_config:
             mock_config.model_name = "test-model"
             mock_config.plan_folder = "plans"
@@ -246,24 +147,8 @@ class TestRunWhisper:
             with patch("claude_whisper.load_models.load_model"):
                 with patch("os.makedirs"):
                     with patch("claude_whisper._run_audio_mode", new_callable=AsyncMock) as mock_audio:
-                        await run_whisper(Path("/tmp"), bypass_whisper=False)
-                        mock_audio.assert_called_once_with(Path("/tmp"))
-
-    @pytest.mark.asyncio
-    async def test_run_whisper_expands_user_path(self):
-        """Test that run_whisper expands user home directory."""
-        with patch("claude_whisper.config") as mock_config:
-            mock_config.model_name = "test-model"
-            mock_config.plan_folder = "plans"
-
-            with patch("claude_whisper.load_models.load_model"):
-                with patch("os.makedirs"):
-                    with patch("claude_whisper._run_bypass_mode", new_callable=AsyncMock) as mock_bypass:
-                        await run_whisper(Path("~/test"), bypass_whisper=True)
-
-                        # Verify the path was expanded
-                        call_args = mock_bypass.call_args[0][0]
-                        assert "~" not in str(call_args)
+                        await run_whisper()
+                        mock_audio.assert_called_once_with()
 
     @pytest.mark.asyncio
     async def test_run_whisper_creates_plan_folder(self):
@@ -274,7 +159,7 @@ class TestRunWhisper:
 
             with patch("claude_whisper.load_models.load_model"):
                 with patch("os.makedirs") as mock_makedirs:
-                    with patch("claude_whisper._run_bypass_mode", new_callable=AsyncMock):
-                        await run_whisper(Path("/tmp"), bypass_whisper=True)
+                    with patch("claude_whisper._run_audio_mode", new_callable=AsyncMock):
+                        await run_whisper()
 
                         mock_makedirs.assert_called_once_with("custom_plans", exist_ok=True)

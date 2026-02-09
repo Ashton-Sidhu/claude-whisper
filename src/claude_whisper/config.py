@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pyaudio
 from pydantic import Field
@@ -83,6 +84,11 @@ class Config(BaseSettings):
     plan_folder: str = Field(
         default="plans",
         description="Folder inside the repository where Claudes design plans should go.",
+    )
+
+    cwd: Path = Field(
+        default_factory=Path.cwd,
+        description="Working directory for Claude sessions. Defaults to the current working directory.",
     )
 
 

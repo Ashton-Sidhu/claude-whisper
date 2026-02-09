@@ -1,9 +1,9 @@
-import textwrap
 import argparse
 import asyncio
 import os
 import re
 import sys
+import textwrap
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -12,7 +12,23 @@ from uuid import uuid4
 
 import mlx_whisper
 import numpy as np
-import pyaudio
+
+try:
+    import pyaudio
+except ImportError as e:
+    if "portaudio" in str(e).lower() or "could not import" in str(e).lower():
+        print(
+            "\nError: PortAudio library not found.\n"
+            "PyAudio requires PortAudio to be installed.\n\n"
+            "Install it with Homebrew:\n"
+            "    brew install portaudio\n\n"
+            "Then reinstall pyaudio:\n"
+            "    pip install --force-reinstall pyaudio\n",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    raise
+
 from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock, ToolUseBlock
 from desktop_notifier import DesktopNotifier
 from loguru import logger
@@ -238,8 +254,9 @@ class ClaudeSDKSession:
             await self.lifecycle.on_error(self.ctx, e)
 
 
-async def _run_claude_task(command: str, working_dir: Path) -> None:
+async def _run_claude_task(command: str) -> None:
     """Create and run a Claude task."""
+    working_dir = config.cwd
 
     ctx = lifecycle_manager.create_context(command, working_dir, config.permission_mode)
     permission_mode = config.permission_mode if ctx.task_type == TaskType.EDIT else TaskType.PLAN
@@ -253,23 +270,6 @@ async def _run_claude_task(command: str, working_dir: Path) -> None:
     session = ClaudeSDKSession(options, ctx)
 
     await session.run(command)
-
-
-async def _run_bypass_mode(working_dir: Path) -> None:
-    """Run in bypass mode - accept text input directly."""
-    logger.info("Running in bypass mode - accepting text input directly")
-    while True:
-        try:
-            print("Enter command: ", end="", file=sys.stderr)
-            user_input = await asyncio.to_thread(input)
-            user_input = user_input.strip()
-
-            if user_input:
-                asyncio.create_task(_run_claude_task(user_input, working_dir))
-
-        except (KeyboardInterrupt, EOFError):
-            logger.info("Exiting bypass mode")
-            break
 
 
 def _parse_push_to_talk_key(key_string: str):
@@ -297,7 +297,7 @@ def _parse_push_to_talk_key(key_string: str):
         return keyboard.Key.esc
 
 
-async def _run_audio_mode(working_dir: Path) -> None:
+async def _run_audio_mode() -> None:
     """Run in audio mode - push-to-talk with configurable key."""
     push_to_talk_key = _parse_push_to_talk_key(config.push_to_talk_key)
     logger.info(f"Push-to-talk key: {config.push_to_talk_key}")
@@ -328,6 +328,9 @@ async def _run_audio_mode(working_dir: Path) -> None:
 
             frames = []
             logger.info("Recording...", file=sys.stderr)
+
+            if is_recording.is_set():
+                await notifier.send(title="Claude Whisper", message="Listening")
 
             while is_recording.is_set():
                 try:
@@ -368,7 +371,8 @@ async def _run_audio_mode(working_dir: Path) -> None:
 
                 # if transcription.startswith(config.command):
                 #     claude_command = transcription.removeprefix(config.command).removeprefix(",").strip()
-                asyncio.create_task(_run_claude_task(transcription, working_dir))
+                if transcription:
+                    asyncio.create_task(_run_claude_task(transcription))
 
     finally:
         stream.stop_stream()
@@ -377,27 +381,40 @@ async def _run_audio_mode(working_dir: Path) -> None:
         listener.stop()
 
 
-async def run_whisper(working_dir: Path, bypass_whisper: bool = False) -> None:
-    """Main entry point for running Claude Whisper in either bypass or audio mode."""
-    working_dir = Path(working_dir).expanduser()
-
+async def run_whisper() -> None:
+    """Main entry point for running Claude Whisper."""
+    logger.info(f"Working directory: {Path.cwd()}")
     logger.info(f"Loading model: {config.model_name}")
     load_models.load_model(config.model_name)
     os.makedirs(config.plan_folder, exist_ok=True)
 
-    if bypass_whisper:
-        await _run_bypass_mode(working_dir)
-    else:
-        await _run_audio_mode(working_dir)
+    await _run_audio_mode()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Claude Whisper - Voice-activated Claude AI assistant")
-    parser.add_argument("working_dir", type=Path, help="Working directory for Claude sessions")
     parser.add_argument(
-        "--bypass-whisper", action="store_true", default=False, help="Bypass whisper and accept text input directly"
+        "--working-directory",
+        type=str,
+        default=None,
+        help="Working directory to use (defaults to current directory).",
+    )
+    parser.add_argument(
+        "--push-to-talk-key",
+        type=str,
+        default=None,
+        help="Key for push-to-talk (e.g., 'esc', 'space', 'ctrl'). Overrides config file and env var.",
     )
 
     args = parser.parse_args()
 
-    asyncio.run(run_whisper(args.working_dir, args.bypass_whisper))
+    if args.working_directory:
+        target = Path(args.working_directory).resolve()
+        if not target.is_dir():
+            parser.error(f"Working directory does not exist: {target}")
+        config.cwd = target
+
+    if args.push_to_talk_key:
+        config.push_to_talk_key = args.push_to_talk_key
+
+    asyncio.run(run_whisper())

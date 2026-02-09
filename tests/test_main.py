@@ -666,8 +666,10 @@ class TestRunClaudeTask:
     """Test _run_claude_task function."""
 
     @pytest.mark.asyncio
-    async def test_run_claude_task_creates_options(self):
+    async def test_run_claude_task_creates_options(self, tmp_path, monkeypatch):
         """Test that _run_claude_task creates ClaudeAgentOptions correctly."""
+        monkeypatch.chdir(tmp_path)
+
         with patch("claude_whisper.config") as mock_config:
             mock_config.permission_mode = "acceptEdits"
             mock_config.plan_folder = "plans"
@@ -677,7 +679,7 @@ class TestRunClaudeTask:
                 mock_session.run = AsyncMock()
                 mock_session_class.return_value = mock_session
 
-                await _run_claude_task("test command", Path("/tmp"))
+                await _run_claude_task("test command")
 
                 # Verify session was created and run was called
                 mock_session_class.assert_called_once()
@@ -688,4 +690,4 @@ class TestRunClaudeTask:
                 options = call_args[0]
                 assert options.allowed_tools == ["Read", "Write", "Bash"]
                 assert options.permission_mode == "acceptEdits"
-                assert options.cwd == Path("/tmp")
+                assert options.cwd == tmp_path

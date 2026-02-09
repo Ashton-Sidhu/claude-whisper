@@ -13,7 +13,6 @@ Claude Whisper enables voice interaction with Claude Code through push-to-talk f
 - Desktop notifications for task status
 - Direct integration with Claude Agent SDK
 - Configurable wake word to trigger Claude commands
-- Text input bypass mode for testing without speech recognition
 - TOML-based configuration with environment variable overrides
 
 ## Requirements
@@ -31,6 +30,36 @@ Your terminal application needs the following permissions enabled in System Sett
 - **Accessibility** - Required for keyboard event monitoring
 
 ## Installation
+
+### Prerequisites
+
+Install PortAudio (required for microphone input):
+
+```bash
+brew install portaudio
+```
+
+### Using uvx (Recommended)
+
+```bash
+uvx claude-whisper /path/to/your/project
+```
+
+### Using pipx
+
+```bash
+pipx install claude-whisper
+claude-whisper /path/to/your/project
+```
+
+### Using pip
+
+```bash
+pip install claude-whisper
+claude-whisper /path/to/your/project
+```
+
+### From Source
 
 1. Install system dependencies:
 ```bash

@@ -1,6 +1,6 @@
 [project]
 name = "claude-whisper"
-version = "0.1.1"
+version = "0.1.2"
 description = "Voice-controlled AI assistant interface for Claude Code using Apple MLX Whisper"
 readme = "README.md"
 license = "BSD-3-Clause"
@@ -27,6 +27,8 @@ dependencies = [
     "desktop-notifier>=6.2.0",
     "loguru>=0.7.3",
     "mlx-whisper>=0.4.3",
+    "mss>=9.0.0",
+    "Pillow>=10.0.0",
     "pyaudio>=0.2.14",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",

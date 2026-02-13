@@ -28,6 +28,7 @@ Your terminal application needs the following permissions enabled in System Sett
 
 - **Input Monitoring** - Required for detecting push-to-talk key presses
 - **Accessibility** - Required for keyboard event monitoring
+- **Screen Recording** - Required for the screenshot tool to capture your screen
 
 ## Installation
 

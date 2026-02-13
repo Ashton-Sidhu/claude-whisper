@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import numpy as np
 import os
 import re
 import sys
@@ -10,20 +11,24 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from uuid import uuid4
+from loguru import logger
+
+from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock, ToolUseBlock
+from .config import config
+from .tools import claude_whisper_mcp_server
 
 _import_start = time.perf_counter()
 
+logger.info("Loading MLX whisper, if this is the first time, it may take a while - hang tight!")
 _t = time.perf_counter()
 import mlx_whisper
-print(f"[import timing] mlx_whisper: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
-_t = time.perf_counter()
-import numpy as np
-print(f"[import timing] numpy: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
+print(f"[import timing] mlx_whisper: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
 try:
     _t = time.perf_counter()
     import pyaudio
+
     print(f"[import timing] pyaudio: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 except ImportError as e:
     if "portaudio" in str(e).lower() or "could not import" in str(e).lower():
@@ -39,29 +44,22 @@ except ImportError as e:
         sys.exit(1)
     raise
 
-_t = time.perf_counter()
-from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock, ToolUseBlock
-print(f"[import timing] claude_agent_sdk: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
 _t = time.perf_counter()
 from desktop_notifier import DesktopNotifier
+
 print(f"[import timing] desktop_notifier: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
 _t = time.perf_counter()
-from loguru import logger
-print(f"[import timing] loguru: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
-
-_t = time.perf_counter()
 from mlx_whisper import load_models
+
 print(f"[import timing] mlx_whisper.load_models: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
 _t = time.perf_counter()
 from pynput import keyboard
+
 print(f"[import timing] pynput: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
-_t = time.perf_counter()
-from .config import config
-print(f"[import timing] config: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
 print(f"[import timing] total imports: {time.perf_counter() - _import_start:.3f}s", file=sys.stderr)
 
@@ -119,10 +117,16 @@ class BaseLifecycle:
 
 
 class EditLifecycle(BaseLifecycle):
+    async def pre_execute(self, ctx: TaskContext):
+        ctx.command = textwrap.dedent(f"""
+            {ctx.command}
+
+            DO NOT ask any follow up questions.
+            DO NOT ask for any clarification. Always go with your recommended approach and state your assumptions at the end.
+        """)
+
     async def execute(self, ctx: TaskContext, client: ClaudeSDKClient):
         await client.query(ctx.command)
-
-        logger.debug("submitted command")
 
         async for message in client.receive_response():
             if isinstance(message, AssistantMessage):
@@ -131,7 +135,6 @@ class EditLifecycle(BaseLifecycle):
                         if self.is_transient_error(block):
                             await self.on_error(ctx, block.text)
                             await client.interrupt()
-
                         logger.debug(block.text)
 
 
@@ -287,13 +290,19 @@ async def _run_claude_task(command: str) -> None:
     working_dir = config.cwd
 
     ctx = lifecycle_manager.create_context(command, working_dir, config.permission_mode)
+
+    logger.debug(f"Starting task with context: {ctx}")
+
     permission_mode = config.permission_mode if ctx.task_type == TaskType.EDIT else TaskType.PLAN
     options = ClaudeAgentOptions(
-        allowed_tools=["Read", "Write", "Bash"],
+        allowed_tools=["mcp__utils__screenshot"],
+        disallowed_tools=["AskUserQuestion"],
         permission_mode=permission_mode,
         cwd=working_dir,
         system_prompt={"type": "preset", "preset": "claude_code"},
         setting_sources=["project"],
+        mcp_servers={"utils": claude_whisper_mcp_server},
+        max_buffer_size=5 * 1024 * 1024,
     )
     session = ClaudeSDKSession(options, ctx)
 
@@ -392,7 +401,7 @@ async def _run_audio_mode() -> None:
                     audio_data,
                     path_or_hf_repo=config.model_name,
                     language="en",
-                    prompt="{config.command}, linting",
+                    prompt=f"{config.command},linting,claude,screen",
                 )
                 transcription = result["text"].strip().lower()
                 logger.info(f"Transcription: {transcription}")

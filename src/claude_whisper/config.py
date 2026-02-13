@@ -1,9 +1,13 @@
 import os
+from typing import Literal
+
 from pathlib import Path
 
 import pyaudio
 from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
+
+PermissionMode = Literal["default", "acceptEdits", "plan", "bypassPermissions"]
 
 
 class Config(BaseSettings):
@@ -69,10 +73,10 @@ class Config(BaseSettings):
         description="Wake word command to trigger Claude. This does nothing right now and will probably be deleted.",
     )
 
-    permission_mode: str = Field(
+    permission_mode: PermissionMode = Field(
         default="acceptEdits",
         description=(
-            "Permission mode for Claude session (acceptEdits, bypassPermissions, default, delegate, dontAsk, plan)"
+            "Permission mode for Claude session (acceptEdits, bypassPermissions, default, plan)"
         ),
     )
 

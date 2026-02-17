@@ -65,6 +65,7 @@ print(f"[import timing] total imports: {time.perf_counter() - _import_start:.3f}
 
 notifier = DesktopNotifier(app_name="Claude Whisper")
 AUDIO_NORMALIZATION_FACTOR = 32768.0
+NOISE_PHRASES = ["you"]
 
 
 class TaskType(str, Enum):
@@ -408,7 +409,7 @@ async def _run_audio_mode() -> None:
 
                 # if transcription.startswith(config.command):
                 #     claude_command = transcription.removeprefix(config.command).removeprefix(",").strip()
-                if transcription:
+                if transcription and transcription.lower() not in NOISE_PHRASES:
                     asyncio.create_task(_run_claude_task(transcription))
 
     finally:

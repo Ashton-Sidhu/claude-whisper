@@ -10,6 +10,8 @@ from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, TextBlock, To
 from pynput import keyboard
 
 from claude_whisper import (
+    DEV_VOCABULARY,
+    WORD_CORRECTIONS,
     BaseLifecycle,
     ClaudeSDKSession,
     EditLifecycle,
@@ -21,6 +23,7 @@ from claude_whisper import (
     TransientError,
     _parse_push_to_talk_key,
     _run_claude_task,
+    apply_word_corrections,
 )
 
 
@@ -691,3 +694,103 @@ class TestRunClaudeTask:
                 assert options.allowed_tools == ["Read", "Write", "Bash"]
                 assert options.permission_mode == "acceptEdits"
                 assert options.cwd == tmp_path
+
+
+class TestDevVocabulary:
+    """Test DEV_VOCABULARY constant."""
+
+    def test_dev_vocabulary_is_non_empty(self):
+        """Test that DEV_VOCABULARY contains entries."""
+        assert len(DEV_VOCABULARY) > 0
+
+    def test_dev_vocabulary_contains_key_terms(self):
+        """Test that DEV_VOCABULARY includes essential dev terms."""
+        expected = ["TypeScript", "Python", "pytest", "kubectl", "docker", "Claude", "API", "git"]
+        for term in expected:
+            assert term in DEV_VOCABULARY, f"Missing expected term: {term}"
+
+
+class TestWordCorrections:
+    """Test WORD_CORRECTIONS dictionary."""
+
+    def test_word_corrections_is_non_empty(self):
+        """Test that WORD_CORRECTIONS contains entries."""
+        assert len(WORD_CORRECTIONS) > 0
+
+    def test_word_corrections_has_common_mistakes(self):
+        """Test that common Whisper misinterpretations are covered."""
+        assert "pie test" in WORD_CORRECTIONS
+        assert "jason" in WORD_CORRECTIONS
+        assert "cube control" in WORD_CORRECTIONS
+        assert "get hub" in WORD_CORRECTIONS
+
+
+class TestApplyWordCorrections:
+    """Test apply_word_corrections function."""
+
+    def test_corrects_single_word(self):
+        """Test correction of a single misinterpreted word."""
+        assert "JSON" in apply_word_corrections("jason")
+
+    def test_corrects_multi_word_phrase(self):
+        """Test correction of a multi-word misinterpretation."""
+        result = apply_word_corrections("run pie test on the project")
+        assert "pytest" in result
+
+    def test_corrects_multiple_mistakes_in_one_string(self):
+        """Test correction of multiple mistakes in a single string."""
+        result = apply_word_corrections("fix the get hub a p i for pie test")
+        assert "GitHub" in result
+        assert "API" in result
+        assert "pytest" in result
+
+    def test_preserves_correct_text(self):
+        """Test that text without mistakes is preserved."""
+        text = "fix the authentication bug in the login page"
+        assert apply_word_corrections(text) == text
+
+    def test_case_insensitive_matching(self):
+        """Test that corrections are case-insensitive."""
+        assert "JSON" in apply_word_corrections("Jason")
+        assert "JSON" in apply_word_corrections("JASON")
+
+    def test_empty_string(self):
+        """Test correction of empty string."""
+        assert apply_word_corrections("") == ""
+
+    def test_custom_corrections(self):
+        """Test using custom corrections dictionary."""
+        custom = {"foo bar": "foobar", "baz": "qux"}
+        result = apply_word_corrections("fix the foo bar and baz", custom)
+        assert "foobar" in result
+        assert "qux" in result
+
+    def test_longer_phrases_matched_first(self):
+        """Test that longer phrases take priority over shorter ones."""
+        # "post gres" should not partially match if "postgres queue l" is also present
+        corrections = {
+            "post gres": "postgres",
+            "post": "POST",
+        }
+        result = apply_word_corrections("post gres database", corrections)
+        assert "postgres" in result
+
+    def test_kubernetes_correction(self):
+        """Test Kubernetes-related corrections."""
+        result = apply_word_corrections("deploy to cube control on cooper netties")
+        assert "kubectl" in result
+        assert "Kubernetes" in result
+
+    def test_cloud_to_claude(self):
+        """Test that 'cloud' is corrected to 'Claude'."""
+        result = apply_word_corrections("ask cloud to fix it")
+        assert "Claude" in result
+
+    def test_whisper_prompt_integration(self):
+        """Test a realistic full transcription correction."""
+        raw = "use pie thon to create a fast api end point with pie dantic"
+        result = apply_word_corrections(raw)
+        assert "Python" in result
+        assert "FastAPI" in result
+        assert "endpoint" in result
+        assert "Pydantic" in result

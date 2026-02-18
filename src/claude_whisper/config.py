@@ -1,7 +1,6 @@
 import os
-from typing import Literal
-
 from pathlib import Path
+from typing import Literal
 
 import pyaudio
 from pydantic import Field
@@ -75,14 +74,17 @@ class Config(BaseSettings):
 
     permission_mode: PermissionMode = Field(
         default="acceptEdits",
-        description=(
-            "Permission mode for Claude session (acceptEdits, bypassPermissions, default, plan)"
-        ),
+        description=("Permission mode for Claude session (acceptEdits, bypassPermissions, default, plan)"),
     )
 
     push_to_talk_key: str = Field(
         default="esc",
         description="Key or key combination for push-to-talk (e.g., 'esc', 'ctrl+shift+r')",
+    )
+
+    model: str = Field(
+        default="claude-sonnet-4-5-20250929",
+        description="Claude model to use for agent sessions (e.g., 'claude-sonnet-4-5-20250929', 'claude-opus-4-6').",
     )
 
     plan_folder: str = Field(

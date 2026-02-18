@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import numpy as np
 import os
 import re
 import sys
@@ -11,10 +10,13 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from uuid import uuid4
+
+import numpy as np
+from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock, ToolUseBlock
 from loguru import logger
 
-from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock, ToolUseBlock
 from .config import config
+from .data import DEV_VOCABULARY, EDIT_PATTERNS, NOISE_PHRASES, PLAN_PATTERNS, WORD_CORRECTIONS
 from .tools import claude_whisper_mcp_server
 
 _import_start = time.perf_counter()
@@ -50,10 +52,7 @@ from desktop_notifier import DesktopNotifier
 
 print(f"[import timing] desktop_notifier: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
-_t = time.perf_counter()
 from mlx_whisper import load_models
-
-print(f"[import timing] mlx_whisper.load_models: {time.perf_counter() - _t:.3f}s", file=sys.stderr)
 
 _t = time.perf_counter()
 from pynput import keyboard
@@ -65,7 +64,26 @@ print(f"[import timing] total imports: {time.perf_counter() - _import_start:.3f}
 
 notifier = DesktopNotifier(app_name="Claude Whisper")
 AUDIO_NORMALIZATION_FACTOR = 32768.0
-NOISE_PHRASES = ["you"]
+
+
+def apply_word_corrections(text: str, corrections: dict[str, str] | None = None) -> str:
+    """Apply word corrections to transcribed text.
+
+    Performs case-insensitive replacement of known misinterpretations.
+    Longer patterns are matched first to avoid partial replacements.
+    """
+    if corrections is None:
+        corrections = WORD_CORRECTIONS
+
+    # Sort by length descending so longer phrases match first
+    sorted_corrections = sorted(corrections.items(), key=lambda x: len(x[0]), reverse=True)
+
+    result = text
+    for wrong, correct in sorted_corrections:
+        pattern = re.compile(re.escape(wrong), re.IGNORECASE)
+        result = pattern.sub(correct, result)
+
+    return result
 
 
 class TaskType(str, Enum):
@@ -180,34 +198,8 @@ class PlanLifecycle(BaseLifecycle):
 
 
 class TaskTypeDetector:
-    # patterns for detecting plan requests
-    plan_patterns = [
-        r"\bplan\b",
-        r"\bdesign\b",
-        r"\barchitect(ure)?\b",
-        r"\bpropos(e|al)\b",
-        r"\bstrategy\b",
-        r"\bapproach\s+for\b",
-        r"\bblueprint\b",
-    ]
-
-    # patterns for detecting edit requests
-    edit_patterns = [
-        r"\bfix\b",
-        r"\bupdate\b",
-        r"\bmodify\b",
-        r"\bchange\b",
-        r"\brefactor\b",
-        r"\badd\b.*\bto\b",
-        r"\bremove\b",
-        r"\bdelete\b",
-        r"\bedit\b",
-        r"\bimplement\b",
-        r"\bcreate\b",
-        r"\bwrite\b",
-        r"\breplace\b",
-        r"\brename\b",
-    ]
+    plan_patterns = PLAN_PATTERNS
+    edit_patterns = EDIT_PATTERNS
 
     def __init__(self):
         self._plan_compiled = [re.compile(p, re.IGNORECASE) for p in self.plan_patterns]
@@ -299,11 +291,21 @@ async def _run_claude_task(command: str) -> None:
         allowed_tools=["mcp__utils__screenshot"],
         disallowed_tools=["AskUserQuestion"],
         permission_mode=permission_mode,
+        model=config.model,
         cwd=working_dir,
         system_prompt={"type": "preset", "preset": "claude_code"},
         setting_sources=["project"],
         mcp_servers={"utils": claude_whisper_mcp_server},
         max_buffer_size=5 * 1024 * 1024,
+        env={
+            "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+            "OTEL_LOGS_EXPORTER": "otlp",
+            "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+            "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": os.getenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", ""),
+            "OTEL_EXPORTER_OTLP_HEADERS": os.getenv("OTEL_EXPORTER_OTLP_HEADERS", ""),
+            "OTEL_LOG_USER_PROMPTS": "1",
+            "OTEL_LOG_TOOL_DETAILS": "1",
+        },
     )
     session = ClaudeSDKSession(options, ctx)
 
@@ -397,14 +399,17 @@ async def _run_audio_mode() -> None:
 
                 audio_data = audio_data.astype(np.float32) / AUDIO_NORMALIZATION_FACTOR
                 logger.info("Transcribing audio...")
+
+                whisper_prompt = ", ".join([config.command] + DEV_VOCABULARY)
                 result = await asyncio.to_thread(
                     mlx_whisper.transcribe,
                     audio_data,
                     path_or_hf_repo=config.model_name,
                     language="en",
-                    prompt=f"{config.command},linting,claude,screen",
+                    prompt=whisper_prompt,
                 )
                 transcription = result["text"].strip().lower()
+                transcription = apply_word_corrections(transcription)
                 logger.info(f"Transcription: {transcription}")
 
                 # if transcription.startswith(config.command):
@@ -443,6 +448,12 @@ def main():
         default=None,
         help="Key for push-to-talk (e.g., 'esc', 'space', 'ctrl'). Overrides config file and env var.",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Claude model to use (e.g., 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'). Overrides config file and env var.",
+    )
 
     args = parser.parse_args()
 
@@ -454,5 +465,8 @@ def main():
 
     if args.push_to_talk_key:
         config.push_to_talk_key = args.push_to_talk_key
+
+    if args.model:
+        config.model = args.model
 
     asyncio.run(run_whisper())
